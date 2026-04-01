@@ -142,9 +142,9 @@ murasaki --aws-profile security-team --aws-region us-west-2 --vertical "retail" 
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
-| `--vertical` | yes | — | Industry vertical (e.g. `financial services`, `healthcare`, `energy`) |
+| `--vertical` | yes | — | Industry vertical. Accepted values: `financial services` \| `healthcare` \| `energy` \| `retail` \| `manufacturing` \| `government` \| `technology` \| `education` |
 | `--assets` | yes | — | Comma-separated key assets (e.g. `Active Directory,AWS,SWIFT`) |
-| `--platforms` | no | `Windows,Linux` | Target OS platforms, comma-separated |
+| `--platforms` | no | `Windows,Linux` | Comma-separated target platforms. Accepted values: `Windows` \| `Linux` \| `macOS` |
 | `--top-n` | no | `15` | Number of TTPs to prioritize (1–50) |
 | `--output-dir` | no | `./murasaki-output` | Directory for generated reports |
 | `--format` | no | `both` | Output format: `markdown`, `html`, or `both` |

@@ -28,8 +28,8 @@ _CONTEXT = {"help_option_names": ["-h", "--help"], "max_content_width": 100}
     context_settings=_CONTEXT,
     epilog=(
         "Authentication (pick one):\n\n"
-        "  export AWS_BEARER_TOKEN_BEDROCK=...   # Bedrock API key — no IAM needed\n"
-        "  export MURASAKI_API_KEY=sk-ant-...    # Anthropic API key\n"
+        "  export AWS_BEARER_TOKEN_BEDROCK=...   # Bedrock API key — no IAM needed\n\n"
+        "  export MURASAKI_API_KEY=sk-ant-...    # Anthropic API key\n\n"
         "  aws configure                         # IAM credentials (default)\n\n"
         "Examples:\n\n"
         "  murasaki --vertical 'financial services' --assets 'Active Directory,SWIFT,AWS'\n\n"
