@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "murasaki"
+version = "0.1.0"
+description = "Purple team TTP prioritization and adversary emulation planner powered by AWS Bedrock"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.38",
+    "click>=8.1",
+    "pydantic>=2.11",
+    "mitreattack-python>=3.1",
+    "httpx>=0.28",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "markdown>=3.7",
+    "rich>=13.9",
+    "platformdirs>=4.3",
+    "anthropic>=0.50",
+]
+
+[project.scripts]
+murasaki = "murasaki.cli:cli"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11",
+    "pytest>=8.3",
+    "pytest-httpx>=0.35",
+    "moto[bedrock]>=5.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["murasaki"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["murasaki"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

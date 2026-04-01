@@ -1,0 +1,88 @@
+# {{ plan.title }}
+
+**Generated:** {{ plan.generated_at_str }}
+**Industry Vertical:** {{ plan.vertical }}
+**Asset Profile:** {{ plan.asset_profile | join(", ") }}
+**Target Platforms:** {{ plan.target_platforms | join(", ") }}
+
+---
+
+## Executive Summary
+
+{{ plan.executive_summary }}
+
+---
+
+## Threat Actor Context
+
+{% for actor in plan.threat_actors %}
+### {{ actor.name }} ({{ actor.group_id }})
+
+{% if actor.aliases %}**Aliases:** {{ actor.aliases | join(", ") }}{% endif %}
+
+{{ actor.relevance_rationale }}
+
+{% endfor %}
+
+---
+
+## Prioritized TTP Attack Chain
+
+{% for ttp in plan.attack_chain %}
+### {{ loop.index }}. {{ ttp.technique_id }} — {{ ttp.technique_name }}
+
+| Field | Value |
+|-------|-------|
+| **Tactic** | {{ ttp.tactic }} |
+| **Platforms** | {{ ttp.platforms | join(", ") }} |
+| **Likelihood** | {{ ttp.likelihood_score }}/5 |
+| **Impact** | {{ ttp.impact_score }}/5 |
+
+**Rationale:** {{ ttp.rationale }}
+
+#### Atomic Red Team Tests
+
+{% if ttp.atomic_tests %}
+| GUID | Name | Platforms | Executor |
+|------|------|-----------|----------|
+{% for t in ttp.atomic_tests %}| `{{ t.guid }}` | {{ t.name }} | {{ t.platforms | join(", ") }} | {{ t.executor_type }} |
+{% endfor %}
+{% else %}
+*No Atomic Red Team tests found for this technique.*
+{% endif %}
+
+#### Caldera Abilities
+
+{% if ttp.caldera_abilities %}
+| Ability ID | Name | Tactic | Platforms |
+|------------|------|--------|-----------|
+{% for a in ttp.caldera_abilities %}| `{{ a.ability_id }}` | {{ a.name }} | {{ a.tactic }} | {{ a.platforms | join(", ") }} |
+{% endfor %}
+{% else %}
+*No Caldera stockpile abilities found for this technique.*
+{% endif %}
+
+#### Detection Hypotheses
+
+{% for d in ttp.detections %}
+**[{{ d.platform | upper }}] {{ d.title }}**
+
+{% if d.platform == "splunk" %}
+```spl
+{{ d.query_or_description }}
+```
+{% else %}
+{{ d.query_or_description }}
+{% endif %}
+
+*Data Sources: {{ d.data_sources | join(", ") }}*
+
+{% endfor %}
+
+---
+
+{% endfor %}
+
+## Methodology Notes
+
+{{ plan.methodology_notes }}

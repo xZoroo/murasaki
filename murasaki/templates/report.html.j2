@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ plan.title | e }}</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-card: #f8f9fa;
+    --bg-code: #f1f3f5;
+    --text: #212529;
+    --text-muted: #6c757d;
+    --border: #dee2e6;
+    --accent: #c0392b;
+    --accent-light: #fadbd8;
+    --link: #1a6bb5;
+    --table-header: #e9ecef;
+    --score-high: #27ae60;
+    --score-mid: #f39c12;
+    --score-low: #e74c3c;
+    --tag-splunk: #ff6b35;
+    --tag-generic: #3498db;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a2e;
+      --bg-card: #16213e;
+      --bg-code: #0f3460;
+      --text: #e0e0e0;
+      --text-muted: #9e9e9e;
+      --border: #374151;
+      --accent: #e74c3c;
+      --accent-light: #2d1515;
+      --link: #60a5fa;
+      --table-header: #1e3a5f;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 2rem; color: var(--accent); margin-bottom: 0.5rem; }
+  h2 { font-size: 1.5rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.4rem; margin: 2.5rem 0 1rem; }
+  h3 { font-size: 1.2rem; margin: 1.5rem 0 0.5rem; color: var(--text); }
+  h4 { font-size: 1rem; margin: 1rem 0 0.4rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .meta { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; }
+  .meta span::before { content: "• "; }
+  .meta span:first-child::before { content: ""; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .ttp-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+  .ttp-id { font-family: monospace; background: var(--accent-light); color: var(--accent); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.9rem; }
+  .scores { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+  .score { padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; color: white; }
+  .score-high { background: var(--score-high); }
+  .score-mid { background: var(--score-mid); }
+  .score-low { background: var(--score-low); }
+  .tactic-tag { background: var(--table-header); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; }
+  table { width: 100%; border-collapse: collapse; margin: 0.5rem 0 1rem; font-size: 0.9rem; }
+  th { background: var(--table-header); text-align: left; padding: 0.5rem 0.75rem; font-weight: 600; }
+  td { padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  code, pre { font-family: "JetBrains Mono", "Fira Code", monospace; }
+  pre { background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; margin: 0.5rem 0 1rem; white-space: pre-wrap; word-break: break-all; }
+  code { background: var(--bg-code); padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+  pre code { background: none; padding: 0; }
+  .detection { border-left: 3px solid var(--border); padding-left: 1rem; margin-bottom: 1rem; }
+  .detection-tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: white; margin-bottom: 0.4rem; }
+  .tag-splunk { background: var(--tag-splunk); }
+  .tag-generic { background: var(--tag-generic); }
+  .data-sources { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.3rem; }
+  .rationale { font-style: italic; color: var(--text-muted); margin: 0.5rem 0 1rem; }
+  .empty-note { color: var(--text-muted); font-size: 0.9rem; font-style: italic; }
+  .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-bottom: 2rem; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { padding-left: 1.5rem; }
+  .toc li { margin: 0.25rem 0; font-size: 0.9rem; }
+  .actor-card { border-left: 3px solid var(--accent); padding-left: 1rem; margin-bottom: 1rem; }
+  .actor-name { font-weight: 700; font-size: 1.05rem; }
+  .actor-aliases { color: var(--text-muted); font-size: 0.85rem; }
+  .summary-box { background: var(--bg-card); border-left: 4px solid var(--accent); padding: 1rem 1.25rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>{{ plan.title | e }}</h1>
+  <div class="meta">
+    <span>Generated: {{ plan.generated_at_str | e }}</span>
+    <span>Vertical: {{ plan.vertical | e }}</span>
+    <span>Assets: {{ plan.asset_profile | join(", ") | e }}</span>
+    <span>Platforms: {{ plan.target_platforms | join(", ") | e }}</span>
+  </div>
+
+  <h2>Executive Summary</h2>
+  <div class="summary-box">{{ plan.executive_summary | e | replace("\n", "<br>") }}</div>
+
+  <h2>Table of Contents</h2>
+  <div class="toc">
+    <ol>
+      {% for ttp in plan.attack_chain %}
+      <li><a href="#ttp-{{ loop.index }}">{{ ttp.technique_id | e }} — {{ ttp.technique_name | e }}</a></li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  <h2>Threat Actor Context</h2>
+  {% for actor in plan.threat_actors %}
+  <div class="actor-card">
+    <div class="actor-name">
+      <a href="https://attack.mitre.org/groups/{{ actor.group_id | e }}/" target="_blank" rel="noopener">
+        {{ actor.name | e }}
+      </a>
+      <span style="color:var(--text-muted);font-weight:400;font-size:0.9rem;"> ({{ actor.group_id | e }})</span>
+    </div>
+    {% if actor.aliases %}
+    <div class="actor-aliases">Aliases: {{ actor.aliases | join(", ") | e }}</div>
+    {% endif %}
+    <p style="margin-top:0.5rem;">{{ actor.relevance_rationale | e }}</p>
+  </div>
+  {% endfor %}
+
+  <h2>Prioritized TTP Attack Chain</h2>
+
+  {% for ttp in plan.attack_chain %}
+  <div class="card" id="ttp-{{ loop.index }}">
+
+    <div class="ttp-header">
+      <div>
+        <a href="https://attack.mitre.org/techniques/{{ ttp.technique_id | replace('.', '/') | e }}/"
+           target="_blank" rel="noopener" class="ttp-id">{{ ttp.technique_id | e }}</a>
+        <strong style="margin-left:0.5rem;">{{ ttp.technique_name | e }}</strong>
+      </div>
+      <span class="tactic-tag">{{ ttp.tactic | e }}</span>
+    </div>
+
+    <div class="scores" style="margin-top:0.75rem;">
+      <span class="score {% if ttp.likelihood_score >= 4 %}score-high{% elif ttp.likelihood_score == 3 %}score-mid{% else %}score-low{% endif %}">
+        Likelihood {{ ttp.likelihood_score }}/5
+      </span>
+      <span class="score {% if ttp.impact_score >= 4 %}score-high{% elif ttp.impact_score == 3 %}score-mid{% else %}score-low{% endif %}">
+        Impact {{ ttp.impact_score }}/5
+      </span>
+      {% if ttp.platforms %}
+      <span style="color:var(--text-muted);font-size:0.85rem;padding-top:0.2rem;">
+        {{ ttp.platforms | join(", ") | e }}
+      </span>
+      {% endif %}
+    </div>
+
+    <p class="rationale">{{ ttp.rationale | e }}</p>
+
+    <h4>Atomic Red Team Tests</h4>
+    {% if ttp.atomic_tests %}
+    <table>
+      <thead><tr><th>GUID</th><th>Name</th><th>Platforms</th><th>Executor</th></tr></thead>
+      <tbody>
+        {% for t in ttp.atomic_tests %}
+        <tr>
+          <td><code>{{ t.guid | e }}</code></td>
+          <td>{{ t.name | e }}</td>
+          <td>{{ t.platforms | join(", ") | e }}</td>
+          <td>{{ t.executor_type | e }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-note">No Atomic Red Team tests found for this technique.</p>
+    {% endif %}
+
+    <h4>Caldera Abilities</h4>
+    {% if ttp.caldera_abilities %}
+    <table>
+      <thead><tr><th>Ability ID</th><th>Name</th><th>Tactic</th><th>Platforms</th></tr></thead>
+      <tbody>
+        {% for a in ttp.caldera_abilities %}
+        <tr>
+          <td><code>{{ a.ability_id | e }}</code></td>
+          <td>{{ a.name | e }}</td>
+          <td>{{ a.tactic | e }}</td>
+          <td>{{ a.platforms | join(", ") | e }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-note">No Caldera stockpile abilities found for this technique.</p>
+    {% endif %}
+
+    <h4>Detection Hypotheses</h4>
+    {% for d in ttp.detections %}
+    <div class="detection">
+      <span class="detection-tag {% if d.platform == 'splunk' %}tag-splunk{% else %}tag-generic{% endif %}">
+        {{ d.platform | upper | e }}
+      </span>
+      <strong>{{ d.title | e }}</strong>
+      {% if d.platform == "splunk" %}
+      <pre><code>{{ d.query_or_description | e }}</code></pre>
+      {% else %}
+      <p style="margin-top:0.3rem;">{{ d.query_or_description | e }}</p>
+      {% endif %}
+      {% if d.data_sources %}
+      <div class="data-sources">Data Sources: {{ d.data_sources | join(", ") | e }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+  </div>
+  {% endfor %}
+
+  {% if plan.methodology_notes %}
+  <h2>Methodology Notes</h2>
+  <div class="summary-box">{{ plan.methodology_notes | e | replace("\n", "<br>") }}</div>
+  {% endif %}
+
+  <footer style="margin-top:3rem;padding-top:1rem;border-top:1px solid var(--border);color:var(--text-muted);font-size:0.8rem;">
+    Generated by murasaki · Powered by AWS Bedrock + MITRE ATT&amp;CK
+  </footer>
+
+</div>
+</body>
+</html>
