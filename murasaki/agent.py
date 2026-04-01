@@ -1,19 +1,22 @@
 """Bedrock agentic loop for murasaki.
 
-Drives a stateful conversation with Claude via either:
-  - AWS Bedrock (boto3 converse API) — uses IAM credentials
-  - Anthropic API (anthropic SDK) — uses an API key
+Drives a stateful conversation with Claude via one of three backends:
+  - AWS Bedrock API key  — Bearer token via AWS_BEARER_TOKEN_BEDROCK env var
+  - Anthropic API key   — calls api.anthropic.com via MURASAKI_API_KEY / --api-key
+  - AWS IAM credentials — boto3 SigV4 signing (access key, IAM role, SSO, etc.)
 
-Both backends normalize messages to Bedrock's internal format so the loop
+All backends normalise messages to Bedrock's internal format so the loop
 logic is shared. The Anthropic backend translates on the way in and out.
 """
 
 import json
 import logging
+import os
 import re
 from typing import Any, Protocol
 
 import boto3
+import httpx
 
 from murasaki.models import EmulationPlan, PlanRequest
 from murasaki.tools.registry import TOOL_SPECS, dispatch
@@ -133,6 +136,51 @@ class _BedrockBackend:
         return stop_reason, output_message
 
 
+class _BedrockApiKeyBackend:
+    """Calls Bedrock using an API key (Bearer token) via direct HTTPS.
+
+    Reads the key from the AWS_BEARER_TOKEN_BEDROCK environment variable.
+    No IAM signing required — the API key is passed as x-amzn-api-key header.
+    """
+
+    def __init__(self, api_key: str, aws_region: str) -> None:
+        self._api_key = api_key
+        self._base_url = f"https://bedrock-runtime.{aws_region}.amazonaws.com"
+
+    def converse(
+        self,
+        messages: list[dict[str, Any]],
+        system_prompt: str,
+        tool_specs: list[dict[str, Any]],
+    ) -> tuple[str, dict[str, Any]]:
+        url = f"{self._base_url}/model/{_BEDROCK_MODEL_ID}/converse"
+        headers = {
+            "Content-Type": "application/json",
+            "x-amzn-api-key": self._api_key,
+        }
+        body: dict[str, Any] = {
+            "system": [{"text": system_prompt}],
+            "messages": messages,
+            "toolConfig": {"tools": tool_specs},
+        }
+        try:
+            with httpx.Client(timeout=120) as client:
+                resp = client.post(url, json=body, headers=headers)
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise AgentLoopError(
+                f"Bedrock API key request failed ({exc.response.status_code}): "
+                f"{exc.response.text[:300]}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise AgentLoopError(f"Bedrock API key request error: {exc}") from exc
+
+        data: dict[str, Any] = resp.json()
+        stop_reason: str = data.get("stopReason", "")
+        output_message: dict[str, Any] = data.get("output", {}).get("message", {})
+        return stop_reason, output_message
+
+
 class _AnthropicBackend:
     """Calls Claude via the Anthropic API (api.anthropic.com) using an API key."""
 
@@ -187,11 +235,13 @@ def run(request: PlanRequest, progress_callback: Any = None) -> EmulationPlan:
     Raises:
         AgentLoopError: If the loop exceeds _MAX_ITERATIONS or encounters an error.
     """
-    backend: _LLMBackend = (
-        _AnthropicBackend(request.api_key)
-        if request.api_key
-        else _BedrockBackend(request.aws_region, request.aws_profile)
-    )
+    bedrock_bearer = os.environ.get("AWS_BEARER_TOKEN_BEDROCK")
+    if bedrock_bearer:
+        backend: _LLMBackend = _BedrockApiKeyBackend(bedrock_bearer, request.aws_region)
+    elif request.api_key:
+        backend = _AnthropicBackend(request.api_key)
+    else:
+        backend = _BedrockBackend(request.aws_region, request.aws_profile)
 
     user_message = _build_initial_message(request)
     messages: list[dict[str, Any]] = [{"role": "user", "content": user_message}]

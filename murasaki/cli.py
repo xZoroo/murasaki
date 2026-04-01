@@ -27,6 +27,10 @@ _CONTEXT = {"help_option_names": ["-h", "--help"], "max_content_width": 100}
 @click.command(
     context_settings=_CONTEXT,
     epilog=(
+        "Authentication (pick one):\n\n"
+        "  export AWS_BEARER_TOKEN_BEDROCK=...   # Bedrock API key — no IAM needed\n"
+        "  export MURASAKI_API_KEY=sk-ant-...    # Anthropic API key\n"
+        "  aws configure                         # IAM credentials (default)\n\n"
         "Examples:\n\n"
         "  murasaki --vertical 'financial services' --assets 'Active Directory,SWIFT,AWS'\n\n"
         "  murasaki --vertical healthcare --assets 'Epic EHR,Active Directory' --top-n 20 --verbose\n\n"  # noqa: E501
@@ -96,7 +100,10 @@ _CONTEXT = {"help_option_names": ["-h", "--help"], "max_content_width": 100}
     default="us-east-1",
     show_default=True,
     metavar="TEXT",
-    help="AWS region for Bedrock. Ignored when --api-key is set.",
+    help=(
+        "AWS region for Bedrock. Used for both IAM and API key auth.\n\n"
+        "Ignored when --api-key (Anthropic) is set."
+    ),
 )
 @click.option(
     "--aws-profile",
@@ -158,8 +165,19 @@ def cli(
     if api_key and aws_profile:
         raise click.UsageError(
             "--api-key and --aws-profile cannot be used together.\n"
-            "  --api-key  → calls api.anthropic.com directly (no AWS needed)\n"
+            "  --api-key     → calls api.anthropic.com directly (no AWS needed)\n"
             "  --aws-profile → uses AWS Bedrock with IAM credentials\n"
+            "Pick one authentication method."
+        )
+
+    import os
+
+    bedrock_bearer = os.environ.get("AWS_BEARER_TOKEN_BEDROCK")
+    if bedrock_bearer and api_key:
+        raise click.UsageError(
+            "AWS_BEARER_TOKEN_BEDROCK and --api-key cannot be used together.\n"
+            "  AWS_BEARER_TOKEN_BEDROCK → Bedrock API key (Bearer token)\n"
+            "  --api-key                → Anthropic API (api.anthropic.com)\n"
             "Pick one authentication method."
         )
 
@@ -168,7 +186,12 @@ def cli(
     formats: list[Literal["markdown", "html"]] = (
         ["markdown", "html"] if fmt == "both" else [fmt]  # type: ignore[list-item]
     )
-    backend_label = "Anthropic API" if api_key else f"AWS Bedrock ({aws_region})"
+    if bedrock_bearer:
+        backend_label = f"Bedrock API key ({aws_region})"
+    elif api_key:
+        backend_label = "Anthropic API"
+    else:
+        backend_label = f"AWS Bedrock IAM ({aws_region})"
 
     request = PlanRequest(
         vertical=vertical,

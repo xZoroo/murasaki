@@ -292,6 +292,58 @@ def test_agent_run_anthropic_backend(tmp_path: Path) -> None:
     mock_anthropic_client.messages.create.assert_called_once()
 
 
+# ---------------------------------------------------------------------------
+# Bedrock API key backend path
+# ---------------------------------------------------------------------------
+
+
+def test_agent_run_bedrock_api_key_backend(tmp_path: Path) -> None:
+    """Agent should use _BedrockApiKeyBackend when AWS_BEARER_TOKEN_BEDROCK is set."""
+    import os
+
+    from murasaki.agent import run
+    from murasaki.models import PlanRequest
+
+    request = PlanRequest(
+        vertical="energy",
+        asset_profile=["SCADA"],
+        platforms=["Windows"],
+        top_n=5,
+        output_dir=tmp_path,
+        formats=["markdown"],
+        aws_region="us-east-1",
+    )
+
+    response_body = {
+        "stopReason": "end_turn",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": f"```json\n{_VALID_PLAN_JSON}\n```"}],
+            }
+        },
+    }
+
+    import httpx
+
+    with (
+        patch.dict(os.environ, {"AWS_BEARER_TOKEN_BEDROCK": "test-bearer-token"}),
+        patch("httpx.Client") as mock_httpx,
+    ):
+        mock_response = MagicMock(spec=httpx.Response)
+        mock_response.json.return_value = response_body
+        mock_response.raise_for_status.return_value = None
+        mock_httpx.return_value.__enter__.return_value.post.return_value = mock_response
+
+        plan = run(request)
+
+    assert isinstance(plan, EmulationPlan)
+    assert plan.vertical == "financial services"
+    # Confirm the Bearer token was sent as the API key header
+    call_kwargs = mock_httpx.return_value.__enter__.return_value.post.call_args
+    assert call_kwargs.kwargs["headers"]["x-amzn-api-key"] == "test-bearer-token"
+
+
 def test_format_translation_roundtrip() -> None:
     """Bedrock tool-use message should round-trip through Anthropic format correctly."""
     from murasaki.agent import _bedrock_msg_to_anthropic

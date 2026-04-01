@@ -59,9 +59,19 @@ murasaki --help
 
 ## Authentication
 
-murasaki supports two authentication modes. Use whichever matches your setup.
+murasaki supports three authentication modes. Use whichever matches your setup.
 
-### Option A — Anthropic API key (simplest)
+### Option A — AWS Bedrock API key (simplest — no IAM needed)
+
+If you have a Bedrock API key (Bearer token), just export it and run — no AWS access/secret keys required:
+
+```bash
+export AWS_BEARER_TOKEN_BEDROCK=your-bedrock-api-key
+```
+
+murasaki detects this variable automatically and routes requests to Bedrock using a Bearer token (`x-amzn-api-key` header). This is the easiest way to use Bedrock without configuring IAM credentials.
+
+### Option B — Anthropic API key
 
 Get an API key from [console.anthropic.com](https://console.anthropic.com) and either pass it on the command line or set the environment variable:
 
@@ -71,7 +81,7 @@ export MURASAKI_API_KEY=sk-ant-...
 
 When `MURASAKI_API_KEY` is set, murasaki calls `api.anthropic.com` directly. No AWS credentials needed.
 
-### Option B — AWS Bedrock
+### Option C — AWS Bedrock IAM credentials
 
 Ensure Claude claude-sonnet-4-6 is enabled in your AWS account under **Amazon Bedrock > Model access**.
 
@@ -96,7 +106,7 @@ Then pass `--aws-profile my-profile` (or omit it to use the default credential c
 ### Basic example
 
 ```bash
-murasaki plan --vertical "financial services" --assets "Active Directory,SWIFT,Bloomberg Terminal,AWS"
+murasaki --vertical "financial services" --assets "Active Directory,SWIFT,Bloomberg Terminal,AWS"
 ```
 
 Reports are written to `./murasaki-output/` by default.
@@ -104,19 +114,26 @@ Reports are written to `./murasaki-output/` by default.
 ### Full example with all options
 
 ```bash
-murasaki plan --vertical "healthcare" --assets "Epic EHR,Active Directory,AWS,VPN" --platforms "Windows,Linux" --top-n 20 --output-dir ./reports/healthcare-q2 --format both --verbose
+murasaki --vertical "healthcare" --assets "Epic EHR,Active Directory,AWS,VPN" --platforms "Windows,Linux" --top-n 20 --output-dir ./reports/healthcare-q2 --format both --verbose
+```
+
+### Using a Bedrock API key
+
+```bash
+export AWS_BEARER_TOKEN_BEDROCK=your-bedrock-api-key
+murasaki --vertical "energy" --assets "SCADA,Historian,Active Directory" --top-n 15
 ```
 
 ### Using an Anthropic API key
 
 ```bash
-murasaki plan --api-key sk-ant-... --vertical "energy" --assets "SCADA,Historian,Active Directory" --top-n 15
+murasaki --api-key sk-ant-... --vertical "energy" --assets "SCADA,Historian,Active Directory" --top-n 15
 ```
 
 ### Using a specific AWS profile
 
 ```bash
-murasaki plan --aws-profile security-team --aws-region us-west-2 --vertical "retail" --assets "POS systems,Active Directory,Azure AD"
+murasaki --aws-profile security-team --aws-region us-west-2 --vertical "retail" --assets "POS systems,Active Directory,Azure AD"
 ```
 
 ---

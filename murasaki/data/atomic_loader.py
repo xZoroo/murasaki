@@ -94,6 +94,6 @@ def _write_cache(path: Path, tests: list[AtomicTest]) -> None:
     """Persist a list of AtomicTest instances to the cache directory."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps([t.model_dump() for t in tests]))
+        path.write_text(json.dumps([t.model_dump() for t in tests]))  # nosec B102 — fixed cache dir
     except OSError as exc:
         logger.debug("Failed to write ART cache for %s: %s", path.stem, exc)
