@@ -16,6 +16,7 @@ import re
 from typing import Any, Protocol
 
 import boto3
+import botocore.config
 import httpx
 
 from murasaki.models import EmulationPlan, PlanRequest
@@ -112,12 +113,71 @@ class _LLMBackend(Protocol):
     ) -> tuple[str, dict[str, Any]]: ...
 
 
+def _to_bedrock_wire(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Translate internal normalized messages to Bedrock converse wire format.
+
+    Internal format uses {"type": X, ...} for content blocks.
+    Bedrock converse uses a tagged union where the type IS the key:
+        text      -> {"text": "..."}
+        toolUse   -> {"toolUse": {"toolUseId": ..., "name": ..., "input": ...}}
+        toolResult-> {"toolResult": {"toolUseId": ..., "content": [...]}}
+    """
+    wire_messages = []
+    for msg in messages:
+        wire_blocks: list[dict[str, Any]] = []
+        for block in msg["content"]:
+            btype = block.get("type")
+            if btype == "text":
+                wire_blocks.append({"text": block["text"]})
+            elif btype == "toolUse":
+                wire_blocks.append(
+                    {
+                        "toolUse": {
+                            "toolUseId": block["toolUseId"],
+                            "name": block["name"],
+                            "input": block.get("input", {}),
+                        }
+                    }
+                )
+            elif btype == "toolResult":
+                wire_blocks.append(
+                    {
+                        "toolResult": {
+                            "toolUseId": block["toolUseId"],
+                            "content": block.get("content", []),
+                        }
+                    }
+                )
+        wire_messages.append({"role": msg["role"], "content": wire_blocks})
+    return wire_messages
+
+
+def _from_bedrock_wire(raw_message: dict[str, Any]) -> dict[str, Any]:
+    """Translate a Bedrock converse response message back to internal normalized format."""
+    internal_blocks: list[dict[str, Any]] = []
+    for block in raw_message.get("content", []):
+        if "text" in block:
+            internal_blocks.append({"type": "text", "text": block["text"]})
+        elif "toolUse" in block:
+            tu = block["toolUse"]
+            internal_blocks.append(
+                {
+                    "type": "toolUse",
+                    "toolUseId": tu["toolUseId"],
+                    "name": tu["name"],
+                    "input": tu.get("input", {}),
+                }
+            )
+    return {"role": raw_message.get("role", "assistant"), "content": internal_blocks}
+
+
 class _BedrockBackend:
     """Calls Claude via AWS Bedrock (boto3 converse API)."""
 
     def __init__(self, aws_region: str, aws_profile: str | None) -> None:
         session = boto3.Session(profile_name=aws_profile, region_name=aws_region)
-        self._client = session.client("bedrock-runtime")
+        cfg = botocore.config.Config(read_timeout=600, connect_timeout=30)
+        self._client = session.client("bedrock-runtime", config=cfg)
 
     def converse(
         self,
@@ -128,12 +188,12 @@ class _BedrockBackend:
         response = self._client.converse(
             modelId=_BEDROCK_MODEL_ID,
             system=[{"text": system_prompt}],
-            messages=messages,
+            messages=_to_bedrock_wire(messages),
             toolConfig={"tools": tool_specs},
         )
         stop_reason: str = response.get("stopReason", "")
-        output_message: dict[str, Any] = response.get("output", {}).get("message", {})
-        return stop_reason, output_message
+        raw_output: dict[str, Any] = response.get("output", {}).get("message", {})
+        return stop_reason, _from_bedrock_wire(raw_output)
 
 
 class _BedrockApiKeyBackend:
@@ -156,15 +216,15 @@ class _BedrockApiKeyBackend:
         url = f"{self._base_url}/model/{_BEDROCK_MODEL_ID}/converse"
         headers = {
             "Content-Type": "application/json",
-            "x-amzn-api-key": self._api_key,
+            "Authorization": f"Bearer {self._api_key}",
         }
         body: dict[str, Any] = {
             "system": [{"text": system_prompt}],
-            "messages": messages,
+            "messages": _to_bedrock_wire(messages),
             "toolConfig": {"tools": tool_specs},
         }
         try:
-            with httpx.Client(timeout=120) as client:
+            with httpx.Client(timeout=600) as client:
                 resp = client.post(url, json=body, headers=headers)
                 resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -177,8 +237,8 @@ class _BedrockApiKeyBackend:
 
         data: dict[str, Any] = resp.json()
         stop_reason: str = data.get("stopReason", "")
-        output_message: dict[str, Any] = data.get("output", {}).get("message", {})
-        return stop_reason, output_message
+        raw_output: dict[str, Any] = data.get("output", {}).get("message", {})
+        return stop_reason, _from_bedrock_wire(raw_output)
 
 
 class _AnthropicBackend:
@@ -287,11 +347,6 @@ def _bedrock_msg_to_anthropic(msg: dict[str, Any]) -> dict[str, Any]:
     """Convert a Bedrock-format message to Anthropic messages API format."""
     role = msg["role"]
     content = msg["content"]
-
-    # Plain string content (initial user message)
-    if isinstance(content, str):
-        return {"role": role, "content": content}
-
     anthropic_content: list[dict[str, Any]] = []
     for block in content:
         block_type = block.get("type")
@@ -352,11 +407,16 @@ def _anthropic_response_to_bedrock(response: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _build_initial_message(request: PlanRequest) -> str:
-    """Build the initial user message from a PlanRequest."""
+def _build_initial_message(request: PlanRequest) -> list[dict[str, Any]]:
+    """Build the initial user message from a PlanRequest.
+
+    Returns a Bedrock-format content block list so that all three backends
+    receive the same structure. boto3's converse() requires content to be a
+    list; the Anthropic backend translates it via _bedrock_msg_to_anthropic.
+    """
     assets_str = ", ".join(request.asset_profile)
     platforms_str = ", ".join(request.platforms)
-    return (
+    text = (
         f"Please create a purple team adversary emulation plan with the following parameters:\n\n"
         f"Industry vertical: {request.vertical}\n"
         f"Key assets: {assets_str}\n"
@@ -366,6 +426,7 @@ def _build_initial_message(request: PlanRequest) -> str:
         "Do not hallucinate any technique IDs, GUIDs, or ability IDs — only use "
         "values returned by the tools."
     )
+    return [{"type": "text", "text": text}]
 
 
 def _handle_tool_use(assistant_message: dict[str, Any], no_cache: bool) -> dict[str, Any]:
@@ -388,11 +449,12 @@ def _handle_tool_use(assistant_message: dict[str, Any], no_cache: bool) -> dict[
             logger.warning("Tool %s raised exception: %s", tool_name, exc)
             result = {"error": str(exc)}
 
+        result_json = result if isinstance(result, dict) else {"results": result}
         tool_results.append(
             {
                 "type": "toolResult",
                 "toolUseId": tool_use_id,
-                "content": [{"json": result}],
+                "content": [{"json": result_json}],
             }
         )
 
