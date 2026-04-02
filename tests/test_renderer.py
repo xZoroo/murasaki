@@ -77,9 +77,8 @@ def _make_plan() -> EmulationPlan:
 def test_markdown_render(tmp_path: Path) -> None:
     plan = _make_plan()
     files = render(plan, tmp_path, ["markdown"])
-    assert len(files) == 1
-    md_path = files[0]
-    assert md_path.suffix == ".md"
+    assert len(files) == 3  # .md + caldera yaml + art runner
+    md_path = next(f for f in files if f.suffix == ".md")
     content = md_path.read_text()
 
     assert "Test Purple Team Plan" in content
@@ -94,9 +93,8 @@ def test_markdown_render(tmp_path: Path) -> None:
 def test_html_render(tmp_path: Path) -> None:
     plan = _make_plan()
     files = render(plan, tmp_path, ["html"])
-    assert len(files) == 1
-    html_path = files[0]
-    assert html_path.suffix == ".html"
+    assert len(files) == 3  # .html + caldera yaml + art runner
+    html_path = next(f for f in files if f.suffix == ".html")
     content = html_path.read_text()
 
     assert "<!DOCTYPE html>" in content
@@ -111,10 +109,12 @@ def test_html_render(tmp_path: Path) -> None:
 def test_both_formats(tmp_path: Path) -> None:
     plan = _make_plan()
     files = render(plan, tmp_path, ["markdown", "html"])
-    assert len(files) == 2
+    assert len(files) == 4  # .md + .html + caldera yaml + art runner
     suffixes = {f.suffix for f in files}
     assert ".md" in suffixes
     assert ".html" in suffixes
+    assert ".yml" in suffixes
+    assert ".ps1" in suffixes
 
 
 def test_output_dir_created(tmp_path: Path) -> None:
@@ -133,3 +133,57 @@ def test_empty_atomic_and_caldera(tmp_path: Path) -> None:
     assert "No Atomic Red Team tests" in md_content
     html_content = next(f for f in files if f.suffix == ".html").read_text()
     assert "No Caldera stockpile abilities" in html_content
+
+
+def test_named_output_files(tmp_path: Path) -> None:
+    plan = _make_plan()
+    files = render(plan, tmp_path, ["markdown", "html"], name="BankofMarina Q2 2026")
+    stems = {f.stem for f in files}
+    # Spaces become hyphens; all files share the same sanitized stem
+    assert any("BankofMarina-Q2-2026" in s for s in stems)
+    names = {f.name for f in files}
+    assert "BankofMarina-Q2-2026.md" in names
+    assert "BankofMarina-Q2-2026.html" in names
+    assert "BankofMarina-Q2-2026-caldera.yml" in names
+    assert "BankofMarina-Q2-2026-art-runner.ps1" in names
+
+
+def test_default_stem_when_no_name(tmp_path: Path) -> None:
+    plan = _make_plan()
+    files = render(plan, tmp_path, ["markdown"])
+    assert any(f.name == "murasaki-report.md" for f in files)
+
+
+def test_caldera_yaml_content(tmp_path: Path) -> None:
+    plan = _make_plan()
+    files = render(plan, tmp_path, ["markdown"])
+    caldera_file = next(f for f in files if f.suffix == ".yml")
+    content = caldera_file.read_text()
+
+    assert "atomic_ordering:" in content
+    assert "123e4567-e89b-12d3-a456-426614174000" in content
+    assert "name:" in content
+    assert "id:" in content
+
+
+def test_art_runner_content(tmp_path: Path) -> None:
+    plan = _make_plan()
+    files = render(plan, tmp_path, ["markdown"])
+    art_file = next(f for f in files if f.suffix == ".ps1")
+    content = art_file.read_text()
+
+    assert "Import-Module invoke-atomicredteam" in content
+    assert "Invoke-AtomicTest T1059.001" in content
+    assert "f7e6ec05-c19e-4a80-b7c9-0d6a0dc6a23f" in content
+
+
+def test_art_runner_no_guids(tmp_path: Path) -> None:
+    """When no atomic GUIDs exist, Invoke-AtomicTest is called without -TestGuids."""
+    plan = _make_plan()
+    plan.attack_chain[0].atomic_tests = []
+    files = render(plan, tmp_path, ["markdown"])
+    art_file = next(f for f in files if f.suffix == ".ps1")
+    content = art_file.read_text()
+
+    assert "Invoke-AtomicTest T1059.001\n" in content
+    assert "-TestGuids" not in content

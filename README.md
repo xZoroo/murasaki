@@ -130,6 +130,14 @@ murasaki --vertical "energy" --assets "SCADA,Historian,Active Directory" --top-n
 murasaki --api-key sk-ant-... --vertical "energy" --assets "SCADA,Historian,Active Directory" --top-n 15
 ```
 
+### Named engagement output
+
+```bash
+murasaki --name "BankofMarina-Q2-2026" --vertical "financial services" --assets "Active Directory,SWIFT,Bloomberg Terminal" --top-n 20
+```
+
+This produces `BankofMarina-Q2-2026.md`, `BankofMarina-Q2-2026.html`, `BankofMarina-Q2-2026-caldera.yml`, and `BankofMarina-Q2-2026-art-runner.ps1`.
+
 ### Using a specific AWS profile
 
 ```bash
@@ -150,6 +158,7 @@ murasaki --aws-profile security-team --aws-region us-west-2 --vertical "retail" 
 | `--format` | no | `both` | Output format: `markdown`, `html`, or `both` |
 | `--aws-region` | no | `us-east-1` | AWS region for Bedrock |
 | `--aws-profile` | no | — | AWS named profile; uses default credential chain if omitted |
+| `--name` | no | — | Engagement name used as the output file stem (e.g. `BankofMarina-Q2-2026`) |
 | `--api-key` | no | — | Anthropic API key; overrides Bedrock. Also reads `MURASAKI_API_KEY` env var |
 | `--no-cache` | no | off | Bypass Atomic Red Team and Caldera local disk cache |
 | `--verbose` | no | off | Print each agent reasoning turn to the console |
@@ -158,12 +167,32 @@ murasaki --aws-profile security-team --aws-region us-west-2 --vertical "retail" 
 
 ## Output
 
-murasaki writes two files to `--output-dir`:
+murasaki writes four files to `--output-dir`. All files share the same stem, which defaults to `murasaki-report` or whatever you pass to `--name`:
 
 | File | Description |
 |------|-------------|
-| `murasaki-report.md` | Full Markdown report — suitable for Git, Confluence, or any Markdown viewer |
-| `murasaki-report.html` | Self-contained HTML report with dark/light mode, color-coded scores, and clickable ATT&CK technique links |
+| `{name}.md` | Full Markdown report — suitable for Git, Confluence, or any Markdown viewer |
+| `{name}.html` | Self-contained HTML report with dark/light mode, color-coded scores, and clickable ATT&CK technique links |
+| `{name}-caldera.yml` | Caldera adversary profile — import via **Adversaries > Import** in the Caldera UI to immediately build a pre-populated adversary with all mapped ability IDs |
+| `{name}-art-runner.ps1` | Invoke-AtomicRedTeam PowerShell runner — runs every prioritized technique using specific test GUIDs; no manual TTP selection needed |
+
+### Using the Caldera export
+
+```bash
+# In the Caldera UI: Adversaries → Import → select {name}-caldera.yml
+# All mapped Caldera ability IDs are loaded as a ready-to-run adversary profile
+```
+
+### Using the Atomic Red Team export
+
+```powershell
+# Prerequisites (one-time)
+Install-Module -Name invoke-atomicredteam -Scope CurrentUser
+Install-Module -Name powershell-yaml -Scope CurrentUser
+
+# Run the emulation plan
+.\BankofMarina-Q2-2026-art-runner.ps1
+```
 
 Each report contains:
 
@@ -172,8 +201,8 @@ Each report contains:
 - **Prioritized attack chain** — TTPs ordered by kill chain phase, each with:
   - Likelihood and impact scores (1–5)
   - Rationale explaining why the TTP was selected
-  - Atomic Red Team test GUIDs (usable with `Invoke-AtomicRedTeam` or Caldera)
-  - Caldera stockpile ability IDs (paste directly into an adversary profile)
+  - Atomic Red Team test GUIDs
+  - Caldera stockpile ability IDs
   - Splunk SPL detection query
   - Generic/platform-agnostic detection hypothesis
 - **Methodology notes**

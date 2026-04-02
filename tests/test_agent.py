@@ -339,9 +339,9 @@ def test_agent_run_bedrock_api_key_backend(tmp_path: Path) -> None:
 
     assert isinstance(plan, EmulationPlan)
     assert plan.vertical == "financial services"
-    # Confirm the Bearer token was sent as the API key header
+    # Confirm the Bearer token was sent in the Authorization header
     call_kwargs = mock_httpx.return_value.__enter__.return_value.post.call_args
-    assert call_kwargs.kwargs["headers"]["x-amzn-api-key"] == "test-bearer-token"
+    assert call_kwargs.kwargs["headers"]["Authorization"] == "Bearer test-bearer-token"
 
 
 def test_format_translation_roundtrip() -> None:

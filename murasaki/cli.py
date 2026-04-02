@@ -115,6 +115,17 @@ _CONTEXT = {"help_option_names": ["-h", "--help"], "max_content_width": 100}
     ),
 )
 @click.option(
+    "--name",
+    default=None,
+    metavar="TEXT",
+    help=(
+        "Engagement name used as the output file stem.\n\n"
+        "Example: 'BankofMarina-Q2-2026' → BankofMarina-Q2-2026.md, "
+        "BankofMarina-Q2-2026-caldera.yml, etc.\n\n"
+        "Defaults to 'murasaki-report' if not set."
+    ),
+)
+@click.option(
     "--no-cache",
     is_flag=True,
     default=False,
@@ -138,6 +149,7 @@ def cli(
     api_key: str | None,
     aws_region: str,
     aws_profile: str | None,
+    name: str | None,
     no_cache: bool,
     verbose: bool,
 ) -> None:
@@ -242,7 +254,7 @@ def cli(
             raise SystemExit(1) from exc
 
         progress.update(task_id, description="Rendering reports…")
-        output_files = renderer.render(emulation_plan, request.output_dir, request.formats)
+        output_files = renderer.render(emulation_plan, request.output_dir, request.formats, name)
 
     console.print("\n[bold green]Done![/bold green] Reports generated:")
     for path in output_files:
