@@ -31,7 +31,7 @@ Typical run: **8–18 API calls** to Claude for a `--top-n 15` plan. Hard cap is
 ## Installation
 
 ```bash
-git clone https://github.com/NFL-ISO/murasaki.git
+git clone https://github.com/xZoroo/murasaki.git
 cd murasaki
 uv venv .venv
 source .venv/bin/activate
@@ -211,7 +211,7 @@ ruff format murasaki/ tests/
 
 ## Author
 
-Built by **Cory** ([@NFL-ISO](https://github.com/NFL-ISO))
+Built by **Cory** ([@xZoroo](https://github.com/xZoroo))
 
 ---
 
